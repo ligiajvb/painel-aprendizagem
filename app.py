@@ -1,11 +1,30 @@
 from flask import Flask, render_template, jsonify, request
 from sheets_manager import sheets_manager
 from datetime import datetime
+import os
+import traceback
 
 app = Flask(__name__, template_folder='template', static_folder='static')
 
 # Configuração para Vercel
 app.config['JSON_AS_ASCII'] = False
+
+# Error handlers
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle all exceptions"""
+    print(f"Error: {str(e)}")
+    print(traceback.format_exc())
+    return jsonify({
+        "error": "Internal server error",
+        "message": str(e),
+        "demo_mode": True
+    }), 500
+
+@app.errorhandler(404)
+def handle_404(e):
+    """Handle 404 errors"""
+    return jsonify({"error": "Not found"}), 404
 
 # ==================== ROTAS ====================
 

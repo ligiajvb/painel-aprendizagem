@@ -4,7 +4,9 @@ import os
 from dotenv import load_dotenv
 import time
 
-load_dotenv()
+# Só carrega .env se não estiver em produção (Vercel)
+if not os.getenv('VERCEL'):
+    load_dotenv()
 
 class SheetsManager:
     """Gerenciador de integração com Google Sheets"""
