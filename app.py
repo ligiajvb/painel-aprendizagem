@@ -97,7 +97,6 @@ def api_raw():
     except Exception as e:
         return jsonify({"error": str(e), "data": {}})
 
-
 @app.route('/api/debug')
 def api_debug():
     """Debug de conexão - remover após resolver o problema"""
@@ -112,16 +111,36 @@ def api_debug():
         "credentials_valid_json": False,
         "credentials_has_private_key": False,
         "credentials_email": None,
+        "connection_test": None,
+        "connection_error": None,
     }
 
     if credentials_json:
         try:
-            creds = json.loads(credentials_json)
+            import gspread
+            from google.oauth2.service_account import Credentials as GCreds
+
+            creds_dict = json.loads(credentials_json)
             debug["credentials_valid_json"] = True
-            debug["credentials_has_private_key"] = "private_key" in creds
-            debug["credentials_email"] = creds.get("client_email")
+            debug["credentials_has_private_key"] = "private_key" in creds_dict
+            debug["credentials_email"] = creds_dict.get("client_email")
+
+            # Testa conexão real
+            scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+            creds = GCreds.from_service_account_info(creds_dict, scopes=scopes)
+            client = gspread.authorize(creds)
+
+            import re
+            match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', sheets_url)
+            sheet_id = match.group(1) if match else None
+            spreadsheet = client.open_by_key(sheet_id)
+            sheets = [s.title for s in spreadsheet.worksheets()]
+            debug["connection_test"] = "SUCCESS"
+            debug["sheets_found"] = sheets
+
         except Exception as e:
-            debug["credentials_parse_error"] = str(e)
+            debug["connection_error"] = str(e)
+            debug["connection_test"] = "FAILED"
 
     return jsonify(debug)
 
