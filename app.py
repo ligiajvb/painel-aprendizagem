@@ -1,8 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from sheets_manager import sheets_manager
-import json
 from datetime import datetime
-import os
 
 app = Flask(__name__, template_folder='template', static_folder='static')
 
@@ -72,9 +70,8 @@ def api_status():
 
 @app.route('/api/raw')
 def api_raw():
-    """Endpoint para dados brutos (compatível com HTML remanescente)"""
+    """Endpoint para dados brutos"""
     try:
-        # Converte do formato de Sheets para o formato esperado pelo HTML
         all_data = sheets_manager.get_all_data()
         return jsonify(all_data)
     except Exception as e:
@@ -84,21 +81,12 @@ def api_raw():
 # ==================== CONFIGURAÇÃO ====================
 
 if __name__ == '__main__':
-    # Inicia sincronização automática a cada 5 minutos
     print("\n" + "="*50)
     print("🚀 Iniciando Painel de Aprendizagem")
     print("="*50)
-    
-    # Não sincroniza dados inicialmente para evitar rate limit
-    print("\n📊 Conectado ao Google Sheets (sincronização sob demanda)")
-    
-    # Inicia sincronização automática (5 minutos)
-    sheets_manager.start_auto_sync(interval_seconds=300)
-    
+    print("\n📊 Modo demonstração ativo")
     print("\n✓ Servidor iniciado!")
     print("📍 Acesso em: http://localhost:5000")
-    print("🔄 Use o botão '🔄 Sincronizar' para atualizar os dados")
     print("="*50 + "\n")
     
-    # Inicia servidor Flask
     app.run(debug=True, host='0.0.0.0', port=5000)
