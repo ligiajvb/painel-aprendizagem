@@ -67,7 +67,7 @@ async function sincronizarDados() {
     
     if (data && Object.keys(data).length > 0) {
       console.log('✓ Dados recebidos:', data);
-      DB.dados = transformarDadosFromSheets(data);
+      DB.dados = data;
       populaSelects();
       atualizar();
     } else {
@@ -78,17 +78,6 @@ async function sincronizarDados() {
     // Usa dados offline se houver erro
     usarDadosOffline();
   }
-}
-
-// Transforma dados do Sheets para o formato esperado
-function transformarDadosFromSheets(sheetsData) {
-  // Se os dados já estão no formato correto, retorna
-  if (sheetsData.DIAG_2026_LP_5ANO) {
-    return sheetsData;
-  }
-  
-  // Senão, tenta transformar de outras estruturas
-  return sheetsData;
 }
 
 // Fallback com dados offline
@@ -126,7 +115,12 @@ let chart = null;
 
 function populaSelects() {
   const selAv = document.getElementById('sel-avaliacao');
-  const avaliacoes = Object.keys(DB.dados).sort();
+  selAv.innerHTML = ''; // Limpa opções existentes
+  
+  // Apenas avaliações que têm dados
+  const avaliacoes = Object.keys(DB.dados).filter(av => 
+    Object.keys(DB.dados[av]).length > 0
+  ).sort();
   
   // Labels mais legíveis
   const labels = {
@@ -135,6 +129,7 @@ function populaSelects() {
     'DIAG_2026_LP_3ANO': '3º ANO — Língua Portuguesa',
     'DIAG_2026_LP_4ANO': '4º ANO — Língua Portuguesa',
     'DIAG_2026_LP_5ANO': '5º ANO — Língua Portuguesa',
+    'DIAG_2026_MAT_1ANO': '1º ANO — Matemática',
     'DIAG_2026_MAT_2ANO': '2º ANO — Matemática',
     'DIAG_2026_MAT_3ANO': '3º ANO — Matemática',
     'DIAG_2026_MAT_4ANO': '4º ANO — Matemática',
@@ -147,6 +142,11 @@ function populaSelects() {
     opt.textContent = labels[av] || av;
     selAv.appendChild(opt);
   });
+  
+  // Seleciona a primeira avaliação se houver
+  if (avaliacoes.length > 0) {
+    selAv.value = avaliacoes[0];
+  }
 }
 
 function atualizaTurmas() {
@@ -155,7 +155,10 @@ function atualizaTurmas() {
   const turmaAtual = sel.value;
   sel.innerHTML = '<option value="TODAS">Todas as turmas</option>';
   
-  const turmas = DB.turmas[av] || [];
+  // Extrai turmas dos dados da avaliação selecionada
+  const dadosAv = DB.dados[av] || {};
+  const turmas = Object.keys(dadosAv).sort();
+  
   turmas.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t;
@@ -169,9 +172,20 @@ function atualizaTurmas() {
 function getDados() {
   const av = document.getElementById('sel-avaliacao').value;
   const turmaFiltro = document.getElementById('sel-turma').value;
-  const questoes = DB.questoes[av] || [];
-  const turmasAv = DB.turmas[av] || [];
+  
+  // Extrai questões dos dados da avaliação
+  const dadosAv = DB.dados[av] || {};
+  const todasQuestoes = new Set();
+  
+  // Coleta todas as questões únicas de todas as turmas
+  Object.values(dadosAv).forEach(turmaData => {
+    Object.keys(turmaData).forEach(questao => todasQuestoes.add(questao));
+  });
+  
+  const questoes = Array.from(todasQuestoes).sort();
+  const turmasAv = Object.keys(dadosAv).sort();
   const turmasFiltradas = turmaFiltro === 'TODAS' ? turmasAv : [turmaFiltro];
+  
   return { av, questoes, turmasFiltradas, turmasAv };
 }
 
@@ -373,8 +387,8 @@ atualizar();
 document.addEventListener('DOMContentLoaded', function() {
   sincronizarDados();
   
-  // Sincroniza a cada 30 segundos (mesma frequência do servidor)
-  setInterval(sincronizarDados, 30000);
+  // Não sincroniza automaticamente a cada 30 segundos para evitar rate limit
+  // setInterval(sincronizarDados, 30000);
   
   // Adiciona botão de sincronização manual
   adicionarBotaoSync();

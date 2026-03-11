@@ -59,20 +59,20 @@ def api_raw():
 # ==================== CONFIGURAÇÃO ====================
 
 if __name__ == '__main__':
-    # Inicia sincronização automática a cada 30 segundos
+    # Inicia sincronização automática a cada 5 minutos
     print("\n" + "="*50)
     print("🚀 Iniciando Painel de Aprendizagem")
     print("="*50)
     
-    # Sincroniza dados inicialmente
-    print("\n📊 Sincronizando dados iniciais...")
-    sheets_manager.sync_data()
+    # Não sincroniza dados inicialmente para evitar rate limit
+    print("\n📊 Conectado ao Google Sheets (sincronização sob demanda)")
     
-    # Inicia sincronização automática
-    sheets_manager.start_auto_sync(interval_seconds=30)
+    # Inicia sincronização automática (5 minutos)
+    sheets_manager.start_auto_sync(interval_seconds=300)
     
     print("\n✓ Servidor iniciado!")
     print("📍 Acesso em: http://localhost:5000")
+    print("🔄 Use o botão '🔄 Sincronizar' para atualizar os dados")
     print("="*50 + "\n")
     
     # Inicia servidor Flask
