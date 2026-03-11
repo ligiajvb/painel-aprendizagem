@@ -3,6 +3,7 @@ from sheets_manager import sheets_manager
 from datetime import datetime
 import os
 import traceback
+import json
 
 app = Flask(__name__, template_folder='template', static_folder='static')
 
@@ -97,6 +98,34 @@ def api_raw():
         return jsonify({"error": str(e), "data": {}})
 
 
+@app.route('/api/debug')
+def api_debug():
+    """Debug de conexão - remover após resolver o problema"""
+    sheets_url = os.getenv('GOOGLE_SHEETS_URL')
+    credentials_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
+
+    debug = {
+        "GOOGLE_SHEETS_URL_set": bool(sheets_url),
+        "GOOGLE_SHEETS_URL_value": sheets_url[:50] + "..." if sheets_url else None,
+        "GOOGLE_CREDENTIALS_JSON_set": bool(credentials_json),
+        "GOOGLE_CREDENTIALS_JSON_length": len(credentials_json) if credentials_json else 0,
+        "credentials_valid_json": False,
+        "credentials_has_private_key": False,
+        "credentials_email": None,
+    }
+
+    if credentials_json:
+        try:
+            creds = json.loads(credentials_json)
+            debug["credentials_valid_json"] = True
+            debug["credentials_has_private_key"] = "private_key" in creds
+            debug["credentials_email"] = creds.get("client_email")
+        except Exception as e:
+            debug["credentials_parse_error"] = str(e)
+
+    return jsonify(debug)
+
+
 # ==================== CONFIGURAÇÃO ====================
 
 if __name__ == '__main__':
@@ -107,5 +136,5 @@ if __name__ == '__main__':
     print("\n✓ Servidor iniciado!")
     print("📍 Acesso em: http://localhost:5000")
     print("="*50 + "\n")
-    
+
     app.run(debug=True, host='0.0.0.0', port=5000)
