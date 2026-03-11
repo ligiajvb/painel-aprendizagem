@@ -24,6 +24,13 @@ class SheetsManager:
     def _initialize_connection(self):
         """Inicializa a conexão com Google Sheets"""
         try:
+            # Verifica se está em ambiente de produção (Vercel)
+            if os.getenv('VERCEL'):
+                print("🌐 Detectado ambiente Vercel - usando modo demo")
+                self.is_connected = False
+                self._load_demo_data()
+                return
+                
             # Se houver arquivo de credenciais, use-o
             creds_file = os.getenv('SHEETS_CREDENTIALS_FILE', 'credentials.json')
             
@@ -34,6 +41,12 @@ class SheetsManager:
                 client = gspread.authorize(creds)
                 sheets_url = os.getenv('GOOGLE_SHEETS_URL')
                 
+                if not sheets_url:
+                    print("⚠ GOOGLE_SHEETS_URL não configurada - usando modo demo")
+                    self.is_connected = False
+                    self._load_demo_data()
+                    return
+                
                 # Extrai o ID da planilha da URL
                 sheet_id = self._extract_sheet_id(sheets_url)
                 self.spreadsheet = client.open_by_key(sheet_id)
@@ -41,17 +54,68 @@ class SheetsManager:
                 print("✓ Conectado ao Google Sheets com sucesso!")
                 # Não sincroniza automaticamente na inicialização
             else:
-                print("⚠ Arquivo credentials.json não encontrado.")
-                print("Para integração com Google Sheets, siga estes passos:")
-                print("1. Acesse: https://console.cloud.google.com/")
-                print("2. Crie um novo projeto")
-                print("3. Ative a Google Sheets API")
-                print("4. Crie uma conta de serviço e baixe o JSON")
-                print("5. Renomeie para 'credentials.json' na raiz do projeto")
+                print("⚠ Arquivo credentials.json não encontrado - usando modo demo")
                 self.is_connected = False
+                self._load_demo_data()
         except Exception as e:
             print(f"✗ Erro ao conectar ao Google Sheets: {e}")
+            print("📊 Usando modo demo")
             self.is_connected = False
+            self._load_demo_data()
+    
+    def _load_demo_data(self):
+        """Carrega dados de demonstração quando não há conexão com Google Sheets"""
+        print("📊 Carregando dados de demonstração...")
+        
+        # Dados demo no formato esperado pelo frontend
+        self.data_dict = {
+            'Resumo_Por_Turma': {
+                'DEMO_1A_Q1': {
+                    'AvaliacaoID': 'DEMO_LP_5ANO',
+                    'TurmaID': '5A',
+                    'QuestaoID': 'Q_1',
+                    '%Acerto': '75%',
+                    'TotalRespostas': '20',
+                    'TotalAcertos': '15',
+                    'Habilidade': 'EF05LP10',
+                    'Descritor': 'Reconhecer o efeito de humor em textos'
+                },
+                'DEMO_1A_Q2': {
+                    'AvaliacaoID': 'DEMO_LP_5ANO',
+                    'TurmaID': '5A',
+                    'QuestaoID': 'Q_2',
+                    '%Acerto': '60%',
+                    'TotalRespostas': '20',
+                    'TotalAcertos': '12',
+                    'Habilidade': 'EF35LP06',
+                    'Descritor': 'Recuperar o sentido do texto'
+                },
+                'DEMO_1B_Q1': {
+                    'AvaliacaoID': 'DEMO_LP_5ANO',
+                    'TurmaID': '5B',
+                    'QuestaoID': 'Q_1',
+                    '%Acerto': '85%',
+                    'TotalRespostas': '20',
+                    'TotalAcertos': '17',
+                    'Habilidade': 'EF05LP10',
+                    'Descritor': 'Reconhecer o efeito de humor em textos'
+                },
+                'DEMO_1B_Q2': {
+                    'AvaliacaoID': 'DEMO_LP_5ANO',
+                    'TurmaID': '5B',
+                    'QuestaoID': 'Q_2',
+                    '%Acerto': '70%',
+                    'TotalRespostas': '20',
+                    'TotalAcertos': '14',
+                    'Habilidade': 'EF35LP06',
+                    'Descritor': 'Recuperar o sentido do texto'
+                }
+            }
+        }
+        
+        self.last_update = time.time()
+        self._transformed_data = None
+        print("✓ Dados de demonstração carregados!")
     
     def _extract_sheet_id(self, url):
         """Extrai o ID da planilha da URL"""
@@ -63,6 +127,11 @@ class SheetsManager:
     
     def sync_data(self):
         """Sincroniza dados da planilha para o dicionário"""
+        # Se está em modo demo, não faz nada
+        if not self.is_connected:
+            print("📊 Usando dados de demonstração (modo offline)")
+            return True
+            
         # Evita sincronizações simultâneas
         if self._sync_in_progress:
             print("⏳ Sincronização já em andamento, aguardando...")

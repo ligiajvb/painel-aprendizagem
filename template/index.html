@@ -70,6 +70,26 @@ async function sincronizarDados() {
       DB.dados = data;
       populaSelects();
       atualizar();
+      
+      // Verifica se está em modo demo
+      if (Object.keys(data)[0] && Object.keys(data)[0].includes('DEMO')) {
+        console.log('📊 Modo demonstração ativo');
+        // Adiciona aviso na página
+        if (!document.getElementById('demo-notice')) {
+          const notice = document.createElement('div');
+          notice.id = 'demo-notice';
+          notice.innerHTML = '📊 <strong>Modo Demonstração</strong> - Configure as variáveis de ambiente na Vercel para usar dados reais';
+          notice.style.cssText = `
+            background: #ffd93d;
+            color: #000;
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 2px solid #e6c230;
+          `;
+          document.body.insertBefore(notice, document.body.firstChild);
+        }
+      }
     } else {
       console.warn('⚠ Nenhum dado retornado da API');
     }
@@ -134,6 +154,7 @@ function populaSelects() {
     'DIAG_2026_MAT_3ANO': '3º ANO — Matemática',
     'DIAG_2026_MAT_4ANO': '4º ANO — Matemática',
     'DIAG_2026_MAT_5ANO': '5º ANO — Matemática',
+    'DEMO_LP_5ANO': '📊 DEMO — 5º ANO (Demonstração)',
   };
   
   avaliacoes.forEach(av => {
