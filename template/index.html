@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Aprendizagem — Diagnóstica 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="logo">📊</div>
+  <div>
+    <h1>Painel de Aprendizagem</h1>
+    <p>Diagnóstica 2026 — Resultados por Questão e Turma</p>
+  </div>
+</header>
+
+<div class="filters">
+  <div class="filter-group">
+    <label>Avaliação</label>
+    <select id="sel-avaliacao" onchange="atualizar()"></select>
+  </div>
+  <div class="filter-group">
+    <label>Visualizar turmas</label>
+    <select id="sel-turma" onchange="atualizar()">
+      <option value="TODAS">Todas as turmas</option>
+    </select>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="chart-section">
+  <div class="section-title">
+    📈 Rendimento por Questão <span>% de acerto comparativo entre turmas</span>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="chart-wrapper">
+    <canvas id="grafico"></canvas>
+  </div>
+</div>
+
+<div class="table-section">
+  <div class="table-header">📋 Detalhamento por Questão e Turma</div>
+  <div id="tabela-container"></div>
+</div>
+
+<script>
+// ==================== GERENCIAMENTO DE DADOS ====================
+// DB será populado com dados da API
+let DB = {
+  dados: {},
+  turmas: {},
+  questoes: {}
+};
+
+// Função para sincronizar dados com o servidor
+async function sincronizarDados() {
+  try {
+    console.log('📡 Sincronizando dados do servidor...');
+    
+    const response = await fetch('/api/data');
+    const data = await response.json();
+    
+    if (data && Object.keys(data).length > 0) {
+      console.log('✓ Dados recebidos:', data);
+      DB.dados = transformarDadosFromSheets(data);
+      populaSelects();
+      atualizar();
+    } else {
+      console.warn('⚠ Nenhum dado retornado da API');
+    }
+  } catch (error) {
+    console.error('✗ Erro ao sincronizar:', error);
+    // Usa dados offline se houver erro
+    usarDadosOffline();
+  }
+}
+
+// Transforma dados do Sheets para o formato esperado
+function transformarDadosFromSheets(sheetsData) {
+  // Se os dados já estão no formato correto, retorna
+  if (sheetsData.DIAG_2026_LP_5ANO) {
+    return sheetsData;
+  }
+  
+  // Senão, tenta transformar de outras estruturas
+  return sheetsData;
+}
+
+// Fallback com dados offline
+function usarDadosOffline() {
+  console.log('📴 Usando modo offline com dados de exemplo');
+  DB.dados = {
+    "DIAG_2026_LP_5ANO": {
+      "5C": {
+        "Q_1": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF05LP10", "descritor": "Reconhecer o efeito de humor"},
+        "Q_2": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF35LP06", "descritor": "Recuperar o sentido do texto"}
+      }
+    }
+  };
+}
+
+// Dados do banco original (será sobrescrito pela API)
+const DB_ORIGINAL = {"dados": {"DIAG_2026_LP_5ANO": {"5C": {"Q_1": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF05LP10", "descritor": "Reconhecer o efeito de humor em textos que conjugam linguage"}, "Q_2": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF35LP06\nEF35LP14", "descritor": "Recuperar o sentido do texto na substituição de termos sinôn"}, "Q_3": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF35LP29", "descritor": "Identificar o conflito gerador do enredo e os elementos que "}, "Q_4": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF12LP04", "descritor": "Identificar marcas, estrutura e formas do texto, observando "}, "Q_5": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF35LP04", "descritor": "Analisar os elementos organizacionais e estruturas do gênero"}, "Q_6": {"pct": 100.0, "total": 2, "acertos": 2, "habilidade": "EF35LP15", "descritor": "Distinguir um fato de uma opinião relativa a esse fato, em t"}, "Q_7": {"pct": 0.0, "total": 2, "acertos": 0, "habilidade": "EF05LP04", "descritor": "Reconhecer, na leitura de textos, o efeito de sentido que de"}, "Q_8": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF35LP05", "descritor": "Compreender o sentido de palavras ou expressões desconhecida"}, "Q_9": {"pct": 0.0, "total": 2, "acertos": 0, "habilidade": "EF03LP19", "descritor": "Localizar informações pontuais em textos e imagens."}, "Q_10": {"pct": 0.0, "total": 2, "acertos": 0, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_11": {"pct": 0.0, "total": 2, "acertos": 0, "habilidade": "EF05LP10", "descritor": "Identificar efeitos de humor e ironia em textos diversos."}, "Q_12": {"pct": 0.0, "total": 2, "acertos": 0, "habilidade": "EF35LP04", "descritor": "Inferir informação em texto verbal."}, "Q_13": {"pct": 50.0, "total": 2, "acertos": 1, "habilidade": "EF04LP13", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}}, "5B": {"Q_1": {"pct": 0.0, "total": 3, "acertos": 0, "habilidade": "EF05LP10", "descritor": "Reconhecer o efeito de humor em textos que conjugam linguage"}, "Q_2": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF35LP06\nEF35LP14", "descritor": "Recuperar o sentido do texto na substituição de termos sinôn"}, "Q_3": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF35LP29", "descritor": "Identificar o conflito gerador do enredo e os elementos que "}, "Q_4": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF12LP04", "descritor": "Identificar marcas, estrutura e formas do texto, observando "}, "Q_5": {"pct": 0.0, "total": 3, "acertos": 0, "habilidade": "EF35LP04", "descritor": "Analisar os elementos organizacionais e estruturas do gênero"}, "Q_6": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF35LP15", "descritor": "Distinguir um fato de uma opinião relativa a esse fato, em t"}, "Q_7": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF05LP04", "descritor": "Reconhecer, na leitura de textos, o efeito de sentido que de"}, "Q_8": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF35LP05", "descritor": "Compreender o sentido de palavras ou expressões desconhecida"}, "Q_9": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF03LP19", "descritor": "Localizar informações pontuais em textos e imagens."}, "Q_10": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_11": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF05LP10", "descritor": "Identificar efeitos de humor e ironia em textos diversos."}, "Q_12": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF35LP04", "descritor": "Inferir informação em texto verbal."}, "Q_13": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF04LP13", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}}, "5D": {"Q_1": {"pct": 45.2, "total": 31, "acertos": 14, "habilidade": "EF05LP10", "descritor": "Reconhecer o efeito de humor em textos que conjugam linguage"}, "Q_2": {"pct": 80.6, "total": 31, "acertos": 25, "habilidade": "EF35LP06\nEF35LP14", "descritor": "Recuperar o sentido do texto na substituição de termos sinôn"}, "Q_3": {"pct": 80.6, "total": 31, "acertos": 25, "habilidade": "EF35LP29", "descritor": "Identificar o conflito gerador do enredo e os elementos que "}, "Q_4": {"pct": 100.0, "total": 31, "acertos": 31, "habilidade": "EF12LP04", "descritor": "Identificar marcas, estrutura e formas do texto, observando "}, "Q_5": {"pct": 12.9, "total": 31, "acertos": 4, "habilidade": "EF35LP04", "descritor": "Analisar os elementos organizacionais e estruturas do gênero"}, "Q_6": {"pct": 58.1, "total": 31, "acertos": 18, "habilidade": "EF35LP15", "descritor": "Distinguir um fato de uma opinião relativa a esse fato, em t"}, "Q_7": {"pct": 87.1, "total": 31, "acertos": 27, "habilidade": "EF05LP04", "descritor": "Reconhecer, na leitura de textos, o efeito de sentido que de"}, "Q_8": {"pct": 93.5, "total": 31, "acertos": 29, "habilidade": "EF35LP05", "descritor": "Compreender o sentido de palavras ou expressões desconhecida"}, "Q_9": {"pct": 100.0, "total": 31, "acertos": 31, "habilidade": "EF03LP19", "descritor": "Localizar informações pontuais em textos e imagens."}, "Q_10": {"pct": 32.3, "total": 31, "acertos": 10, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_11": {"pct": 71.0, "total": 31, "acertos": 22, "habilidade": "EF05LP10", "descritor": "Identificar efeitos de humor e ironia em textos diversos."}, "Q_12": {"pct": 83.9, "total": 31, "acertos": 26, "habilidade": "EF35LP04", "descritor": "Inferir informação em texto verbal."}, "Q_13": {"pct": 90.3, "total": 31, "acertos": 28, "habilidade": "EF04LP13", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}}}, "DIAG_2026_LP_4ANO": {"4C": {"Q_1": {"pct": 100.0, "total": 24, "acertos": 24, "habilidade": "EF01LP05", "descritor": "Compreender que a escrita é a forma de representação da fala"}, "Q_2": {"pct": 95.8, "total": 24, "acertos": 23, "habilidade": "EF35LP29", "descritor": "Localizar informação explícita."}, "Q_3": {"pct": 79.2, "total": 24, "acertos": 19, "habilidade": "EF05LP11", "descritor": "Reconhecer e registrar o efeito de humor em textos que conju"}, "Q_4": {"pct": 70.8, "total": 24, "acertos": 17, "habilidade": "EF04LP26", "descritor": "Identificar a característica de texto estruturados em versos"}, "Q_5": {"pct": 87.5, "total": 24, "acertos": 21, "habilidade": "EF35LP04", "descritor": "Inferir informações implícitas em textos."}, "Q_6": {"pct": 95.8, "total": 24, "acertos": 23, "habilidade": "EF15LP16", "descritor": "Localizar informação explícita."}, "Q_7": {"pct": 91.7, "total": 24, "acertos": 22, "habilidade": "EF02LP07", "descritor": "Ler e escrever palavras, frases e textos curtos em letras de"}, "Q_8": {"pct": 50.0, "total": 24, "acertos": 12, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_9": {"pct": 91.7, "total": 24, "acertos": 22, "habilidade": "EF35LP01", "descritor": "Ler por si mesmo diferentes gêneros utilizando indicadores p"}, "Q_10": {"pct": 54.2, "total": 24, "acertos": 13, "habilidade": "EF35LP14", "descritor": "Reconhecer e utilizar pronomes pessoais, possessivos e demon"}, "Q_11": {"pct": 91.7, "total": 24, "acertos": 22, "habilidade": "EF04LP19", "descritor": "Identificar tema e assunto de um texto lido, com ou sem apoi"}, "Q_12": {"pct": 91.7, "total": 24, "acertos": 22, "habilidade": "EF04LP13", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}, "Q_13": {"pct": 66.7, "total": 24, "acertos": 16, "habilidade": "EF35LP04", "descritor": "Utilizar estratégias de leitura (seleção, antecipação, decod"}}, "4A": {"Q_1": {"pct": 100.0, "total": 25, "acertos": 25, "habilidade": "EF01LP05", "descritor": "Compreender que a escrita é a forma de representação da fala"}, "Q_2": {"pct": 100.0, "total": 25, "acertos": 25, "habilidade": "EF35LP29", "descritor": "Localizar informação explícita."}, "Q_3": {"pct": 64.0, "total": 25, "acertos": 16, "habilidade": "EF05LP11", "descritor": "Reconhecer e registrar o efeito de humor em textos que conju"}, "Q_4": {"pct": 72.0, "total": 25, "acertos": 18, "habilidade": "EF04LP26", "descritor": "Identificar a característica de texto estruturados em versos"}, "Q_5": {"pct": 80.0, "total": 25, "acertos": 20, "habilidade": "EF35LP04", "descritor": "Inferir informações implícitas em textos."}, "Q_6": {"pct": 88.0, "total": 25, "acertos": 22, "habilidade": "EF15LP16", "descritor": "Localizar informação explícita."}, "Q_7": {"pct": 96.0, "total": 25, "acertos": 24, "habilidade": "EF02LP07", "descritor": "Ler e escrever palavras, frases e textos curtos em letras de"}, "Q_8": {"pct": 32.0, "total": 25, "acertos": 8, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_9": {"pct": 84.0, "total": 25, "acertos": 21, "habilidade": "EF35LP01", "descritor": "Ler por si mesmo diferentes gêneros utilizando indicadores p"}, "Q_10": {"pct": 64.0, "total": 25, "acertos": 16, "habilidade": "EF35LP14", "descritor": "Reconhecer e utilizar pronomes pessoais, possessivos e demon"}, "Q_11": {"pct": 72.0, "total": 25, "acertos": 18, "habilidade": "EF04LP19", "descritor": "Identificar tema e assunto de um texto lido, com ou sem apoi"}, "Q_12": {"pct": 72.0, "total": 25, "acertos": 18, "habilidade": "EF04LP13", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}, "Q_13": {"pct": 40.0, "total": 25, "acertos": 10, "habilidade": "EF35LP04", "descritor": "Utilizar estratégias de leitura (seleção, antecipação, decod"}}}, "DIAG_2026_MAT_4ANO": {"4A": {"Q_1": {"pct": 12.0, "total": 25, "acertos": 3, "habilidade": "EF04MA06", "descritor": "Resolver problemas envolvendo significados da multiplicação."}, "Q_2": {"pct": 24.0, "total": 25, "acertos": 6, "habilidade": "EF04MA22", "descritor": "Ler e registrar medidas e intervalos de tempo em horas, minu"}, "Q_3": {"pct": 84.0, "total": 25, "acertos": 21, "habilidade": "EF04MA11", "descritor": "Identificar padrões e regularidades nos fatos fundamentais d"}, "Q_4": {"pct": 100.0, "total": 25, "acertos": 25, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_5": {"pct": 76.0, "total": 25, "acertos": 19, "habilidade": "EF04MA02", "descritor": "Compor e decompor números naturais, explorando o princípio a"}, "Q_6": {"pct": 8.0, "total": 25, "acertos": 2, "habilidade": "EF04MA20", "descritor": "Calcular o perímetro de figuras planas."}, "Q_7": {"pct": 96.0, "total": 25, "acertos": 24, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de figuras."}, "Q_8": {"pct": 96.0, "total": 25, "acertos": 24, "habilidade": "EF04MA01", "descritor": "Comparar escritas numéricas."}, "Q_9": {"pct": 48.0, "total": 25, "acertos": 12, "habilidade": "EF03MA25", "descritor": "Reconhecer, em eventos aleatórios, possíveis resultados e ap"}, "Q_10": {"pct": 100.0, "total": 25, "acertos": 25, "habilidade": "EF03MA13", "descritor": "Associar figuras geométricas espaciais a suas planificações."}, "Q_11": {"pct": 28.0, "total": 25, "acertos": 7, "habilidade": "EF04MA07", "descritor": "Analisar, interpretar, formular e resolver situações-problem"}, "Q_12": {"pct": 28.0, "total": 25, "acertos": 7, "habilidade": "EF03MA23", "descritor": "Ler horas em relógios digitais e analógicos;"}, "Q_13": {"pct": 40.0, "total": 25, "acertos": 10, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_14": {"pct": 44.0, "total": 25, "acertos": 11, "habilidade": "EF04MA25", "descritor": "Resolver e elaborar problemas que envolvam a comparação e a "}, "Q_15": {"pct": 100.0, "total": 25, "acertos": 25, "habilidade": "EF03MA13", "descritor": "Reconhecer os sólidos geométricos cubos, paralelepípedo/bloc"}, "Q_16": {"pct": 68.0, "total": 25, "acertos": 17, "habilidade": "EF04MA20", "descritor": "Resolver situações-problema envolvendo as unidades de medida"}}, "4C": {"Q_1": {"pct": 17.4, "total": 23, "acertos": 4, "habilidade": "EF04MA06", "descritor": "Resolver problemas envolvendo significados da multiplicação."}, "Q_2": {"pct": 34.8, "total": 23, "acertos": 8, "habilidade": "EF04MA22", "descritor": "Ler e registrar medidas e intervalos de tempo em horas, minu"}, "Q_3": {"pct": 100.0, "total": 23, "acertos": 23, "habilidade": "EF04MA11", "descritor": "Identificar padrões e regularidades nos fatos fundamentais d"}, "Q_4": {"pct": 100.0, "total": 23, "acertos": 23, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_5": {"pct": 87.0, "total": 23, "acertos": 20, "habilidade": "EF04MA02", "descritor": "Compor e decompor números naturais, explorando o princípio a"}, "Q_6": {"pct": 13.0, "total": 23, "acertos": 3, "habilidade": "EF04MA20", "descritor": "Calcular o perímetro de figuras planas."}, "Q_7": {"pct": 91.3, "total": 23, "acertos": 21, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de figuras."}, "Q_8": {"pct": 100.0, "total": 23, "acertos": 23, "habilidade": "EF04MA01", "descritor": "Comparar escritas numéricas."}, "Q_9": {"pct": 73.9, "total": 23, "acertos": 17, "habilidade": "EF03MA25", "descritor": "Reconhecer, em eventos aleatórios, possíveis resultados e ap"}, "Q_10": {"pct": 87.0, "total": 23, "acertos": 20, "habilidade": "EF03MA13", "descritor": "Associar figuras geométricas espaciais a suas planificações."}, "Q_11": {"pct": 39.1, "total": 23, "acertos": 9, "habilidade": "EF04MA07", "descritor": "Analisar, interpretar, formular e resolver situações-problem"}, "Q_12": {"pct": 65.2, "total": 23, "acertos": 15, "habilidade": "EF03MA23", "descritor": "Ler horas em relógios digitais e analógicos;"}, "Q_13": {"pct": 87.0, "total": 23, "acertos": 20, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_14": {"pct": 47.8, "total": 23, "acertos": 11, "habilidade": "EF04MA25", "descritor": "Resolver e elaborar problemas que envolvam a comparação e a "}, "Q_15": {"pct": 100.0, "total": 23, "acertos": 23, "habilidade": "EF03MA13", "descritor": "Reconhecer os sólidos geométricos cubos, paralelepípedo/bloc"}, "Q_16": {"pct": 78.3, "total": 23, "acertos": 18, "habilidade": "EF04MA20", "descritor": "Resolver situações-problema envolvendo as unidades de medida"}}, "4E": {"Q_1": {"pct": 4.2, "total": 24, "acertos": 1, "habilidade": "EF04MA06", "descritor": "Resolver problemas envolvendo significados da multiplicação."}, "Q_2": {"pct": 16.7, "total": 24, "acertos": 4, "habilidade": "EF04MA22", "descritor": "Ler e registrar medidas e intervalos de tempo em horas, minu"}, "Q_3": {"pct": 83.3, "total": 24, "acertos": 20, "habilidade": "EF04MA11", "descritor": "Identificar padrões e regularidades nos fatos fundamentais d"}, "Q_4": {"pct": 100.0, "total": 24, "acertos": 24, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_5": {"pct": 37.5, "total": 24, "acertos": 9, "habilidade": "EF04MA02", "descritor": "Compor e decompor números naturais, explorando o princípio a"}, "Q_6": {"pct": 8.3, "total": 24, "acertos": 2, "habilidade": "EF04MA20", "descritor": "Calcular o perímetro de figuras planas."}, "Q_7": {"pct": 83.3, "total": 24, "acertos": 20, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de figuras."}, "Q_8": {"pct": 100.0, "total": 24, "acertos": 24, "habilidade": "EF04MA01", "descritor": "Comparar escritas numéricas."}, "Q_9": {"pct": 58.3, "total": 24, "acertos": 14, "habilidade": "EF03MA25", "descritor": "Reconhecer, em eventos aleatórios, possíveis resultados e ap"}, "Q_10": {"pct": 87.5, "total": 24, "acertos": 21, "habilidade": "EF03MA13", "descritor": "Associar figuras geométricas espaciais a suas planificações."}, "Q_11": {"pct": 25.0, "total": 24, "acertos": 6, "habilidade": "EF04MA07", "descritor": "Analisar, interpretar, formular e resolver situações-problem"}, "Q_12": {"pct": 29.2, "total": 24, "acertos": 7, "habilidade": "EF03MA23", "descritor": "Ler horas em relógios digitais e analógicos;"}, "Q_13": {"pct": 16.7, "total": 24, "acertos": 4, "habilidade": "EF04MA27", "descritor": "Ler e interpretar dados apresentados por meio de gráficos de"}, "Q_14": {"pct": 25.0, "total": 24, "acertos": 6, "habilidade": "EF04MA25", "descritor": "Resolver e elaborar problemas que envolvam a comparação e a "}, "Q_15": {"pct": 91.7, "total": 24, "acertos": 22, "habilidade": "EF03MA13", "descritor": "Reconhecer os sólidos geométricos cubos, paralelepípedo/bloc"}, "Q_16": {"pct": 50.0, "total": 24, "acertos": 12, "habilidade": "EF04MA20", "descritor": "Resolver situações-problema envolvendo as unidades de medida"}}}, "DIAG_2026_MAT_5ANO": {"5D": {"Q_1": {"pct": 93.5, "total": 31, "acertos": 29, "habilidade": "EF03MA02", "descritor": " Decompor e compor números naturais até a 4ª ordem"}, "Q_2": {"pct": 61.3, "total": 31, "acertos": 19, "habilidade": "EF04MA25", "descritor": "Resolver e elaborar problemas que envolvam o sistema monetár"}, "Q_3": {"pct": 58.1, "total": 31, "acertos": 18, "habilidade": "EF05MA12", "descritor": "Compreender o conceito de proporcionalidade direta"}, "Q_4": {"pct": 54.8, "total": 31, "acertos": 17, "habilidade": "EF05MA24", "descritor": "Resolver situações-problema nas quais os dados são apresenta"}, "Q_5": {"pct": 45.2, "total": 31, "acertos": 14, "habilidade": "EF04MA09", "descritor": "Reconhecer a representação fracionária em situações do cotid"}, "Q_6": {"pct": 90.3, "total": 31, "acertos": 28, "habilidade": "EF05MA15", "descritor": "Interpretar o deslocamento a partir da indicação de dois pon"}, "Q_7": {"pct": 100.0, "total": 31, "acertos": 31, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de figuras."}, "Q_8": {"pct": 54.8, "total": 31, "acertos": 17, "habilidade": "EF05MA08", "descritor": "Resolver situações-problema utilizando estratégias diversas "}, "Q_9": {"pct": 83.9, "total": 31, "acertos": 26, "habilidade": "EF05MA24", "descritor": "Resolver situações-problema nas quais os dados são apresenta"}, "Q_10": {"pct": 3.2, "total": 31, "acertos": 1, "habilidade": "EF05MA16", "descritor": "Reconhecer os atributos das figuras geométricas espaciais: f"}, "Q_11": {"pct": 77.4, "total": 31, "acertos": 24, "habilidade": "EF05MA07", "descritor": "Resolver problemas com números racionais;\nReconhecer que um "}, "Q_12": {"pct": 41.9, "total": 31, "acertos": 13, "habilidade": "EF05MA19", "descritor": "Medir e comparar área de figuras planas (incluindo seu perím"}, "Q_13": {"pct": 67.7, "total": 31, "acertos": 21, "habilidade": "EF05MA22", "descritor": "Perceber resultados possíveis em experimentos;"}, "Q_14": {"pct": 38.7, "total": 31, "acertos": 12, "habilidade": "EF04MA22", "descritor": "Ler e registrar medidas e intervalos de tempo em horas, minu"}, "Q_15": {"pct": 54.8, "total": 31, "acertos": 17, "habilidade": "EF02MA15", "descritor": "Reconhecer os contornos do quadrado, retângulo, triângulo e "}, "Q_16": {"pct": 64.5, "total": 31, "acertos": 20, "habilidade": "EF05MA19", "descritor": "Utilizar as medidas, lendo e registrando intervalos de tempo"}}}, "DIAG_2026_LP_2ANO": {"2C": {"Q_1": {"pct": 53.8, "total": 26, "acertos": 14, "habilidade": "EF02LP02", "descritor": "Substituir ou remover sílabas iniciais, mediais ou finais pa"}, "Q_2": {"pct": 100.0, "total": 26, "acertos": 26, "habilidade": "EF12LP01", "descritor": "Comparar palavras reconhecidas de memória com palavras novas"}, "Q_3": {"pct": 84.6, "total": 26, "acertos": 22, "habilidade": "EF02LP16", "descritor": "Reconhecer textos receitas respeitando suas especificidades "}, "Q_4": {"pct": 69.2, "total": 26, "acertos": 18, "habilidade": "EF02LP08", "descritor": "Reconhecer que as palavras são separadas por espaços em bran"}, "Q_5": {"pct": 46.2, "total": 26, "acertos": 12, "habilidade": "EF12LP07", "descritor": "Identificar palavras que rimam através da leitura de imagem"}, "Q_6": {"pct": 61.5, "total": 26, "acertos": 16, "habilidade": "EF02LP07", "descritor": "Ler e escrever palavras, frases e textos curtos em letras de"}, "Q_7": {"pct": 65.4, "total": 26, "acertos": 17, "habilidade": "EF12LP15", "descritor": "Realizar inferências sobre o sentido do conteúdo de slogans "}, "Q_8": {"pct": 80.8, "total": 26, "acertos": 21, "habilidade": "EF12LP19", "descritor": "Ler e compreender textos escritos em versos, identificando r"}, "Q_9": {"pct": 65.4, "total": 26, "acertos": 17, "habilidade": "EF12LP09", "descritor": "Identificar mensagens explícitas e implícitas dos textos, re"}, "Q_10": {"pct": 65.4, "total": 26, "acertos": 17, "habilidade": "EF01LP05", "descritor": "Compreender o sistema de escrita alfabético, a ordem das let"}, "Q_11": {"pct": 57.7, "total": 26, "acertos": 15, "habilidade": "EF02LP02 ", "descritor": "Separar corretamente as sílabas que compõem as palavras."}}, "2E": {"Q_1": {"pct": 30.0, "total": 20, "acertos": 6, "habilidade": "EF02LP02", "descritor": "Substituir ou remover sílabas iniciais, mediais ou finais pa"}, "Q_2": {"pct": 95.0, "total": 20, "acertos": 19, "habilidade": "EF12LP01", "descritor": "Comparar palavras reconhecidas de memória com palavras novas"}, "Q_3": {"pct": 85.0, "total": 20, "acertos": 17, "habilidade": "EF02LP16", "descritor": "Reconhecer textos receitas respeitando suas especificidades "}, "Q_4": {"pct": 40.0, "total": 20, "acertos": 8, "habilidade": "EF02LP08", "descritor": "Reconhecer que as palavras são separadas por espaços em bran"}, "Q_5": {"pct": 60.0, "total": 20, "acertos": 12, "habilidade": "EF12LP07", "descritor": "Identificar palavras que rimam através da leitura de imagem"}, "Q_6": {"pct": 100.0, "total": 20, "acertos": 20, "habilidade": "EF02LP07", "descritor": "Ler e escrever palavras, frases e textos curtos em letras de"}, "Q_7": {"pct": 75.0, "total": 20, "acertos": 15, "habilidade": "EF12LP15", "descritor": "Realizar inferências sobre o sentido do conteúdo de slogans "}, "Q_8": {"pct": 85.0, "total": 20, "acertos": 17, "habilidade": "EF12LP19", "descritor": "Ler e compreender textos escritos em versos, identificando r"}, "Q_9": {"pct": 65.0, "total": 20, "acertos": 13, "habilidade": "EF12LP09", "descritor": "Identificar mensagens explícitas e implícitas dos textos, re"}, "Q_10": {"pct": 80.0, "total": 20, "acertos": 16, "habilidade": "EF01LP05", "descritor": "Compreender o sistema de escrita alfabético, a ordem das let"}, "Q_11": {"pct": 70.0, "total": 20, "acertos": 14, "habilidade": "EF02LP02 ", "descritor": "Separar corretamente as sílabas que compõem as palavras."}}, "2D": {"Q_1": {"pct": 38.9, "total": 18, "acertos": 7, "habilidade": "EF02LP02", "descritor": "Substituir ou remover sílabas iniciais, mediais ou finais pa"}, "Q_2": {"pct": 100.0, "total": 18, "acertos": 18, "habilidade": "EF12LP01", "descritor": "Comparar palavras reconhecidas de memória com palavras novas"}, "Q_3": {"pct": 66.7, "total": 18, "acertos": 12, "habilidade": "EF02LP16", "descritor": "Reconhecer textos receitas respeitando suas especificidades "}, "Q_4": {"pct": 83.3, "total": 18, "acertos": 15, "habilidade": "EF02LP08", "descritor": "Reconhecer que as palavras são separadas por espaços em bran"}, "Q_5": {"pct": 72.2, "total": 18, "acertos": 13, "habilidade": "EF12LP07", "descritor": "Identificar palavras que rimam através da leitura de imagem"}, "Q_6": {"pct": 72.2, "total": 18, "acertos": 13, "habilidade": "EF02LP07", "descritor": "Ler e escrever palavras, frases e textos curtos em letras de"}, "Q_7": {"pct": 55.6, "total": 18, "acertos": 10, "habilidade": "EF12LP15", "descritor": "Realizar inferências sobre o sentido do conteúdo de slogans "}, "Q_8": {"pct": 100.0, "total": 18, "acertos": 18, "habilidade": "EF12LP19", "descritor": "Ler e compreender textos escritos em versos, identificando r"}, "Q_9": {"pct": 72.2, "total": 18, "acertos": 13, "habilidade": "EF12LP09", "descritor": "Identificar mensagens explícitas e implícitas dos textos, re"}, "Q_10": {"pct": 83.3, "total": 18, "acertos": 15, "habilidade": "EF01LP05", "descritor": "Compreender o sistema de escrita alfabético, a ordem das let"}, "Q_11": {"pct": 83.3, "total": 18, "acertos": 15, "habilidade": "EF02LP02 ", "descritor": "Separar corretamente as sílabas que compõem as palavras."}}}, "DIAG_2026_MAT_2ANO": {"2C": {"Q_1": {"pct": 56.0, "total": 25, "acertos": 14, "habilidade": "EF01MA04", "descritor": "Contar elementos até 100 e identificar o número corresponden"}, "Q_2": {"pct": 28.0, "total": 25, "acertos": 7, "habilidade": "EF02MA20", "descritor": "Relacionar valores das cédulas e moedas para resolver situaç"}, "Q_3": {"pct": 92.0, "total": 25, "acertos": 23, "habilidade": "EF01MA15", "descritor": " Comparar objetos diversos pelo comprimento, espessura, altu"}, "Q_4": {"pct": 84.0, "total": 25, "acertos": 21, "habilidade": "EF01MA21", "descritor": "Ler gráficos de colunas simples"}, "Q_5": {"pct": 36.0, "total": 25, "acertos": 9, "habilidade": "EF02MA03", "descritor": "Compreender por meio da correspondência entre elementos de d"}, "Q_6": {"pct": 52.0, "total": 25, "acertos": 13, "habilidade": "EF02MA12", "descritor": "Identificar em desenhos, indicações de direção a partir de u"}, "Q_7": {"pct": 64.0, "total": 25, "acertos": 16, "habilidade": "EF01MA10", "descritor": "Identificar e completar com elementos ausentes, sequências  "}, "Q_8": {"pct": 4.0, "total": 25, "acertos": 1, "habilidade": "EF02MA01", "descritor": "Identificar o valor posicional dos algarismos"}, "Q_9": {"pct": 56.0, "total": 25, "acertos": 14, "habilidade": "EF01MA21", "descritor": "Leitura de tabelas "}, "Q_10": {"pct": 32.0, "total": 25, "acertos": 8, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de números natura"}, "Q_11": {"pct": 64.0, "total": 25, "acertos": 16, "habilidade": "EF01MA13", "descritor": "Associar formas geométricas espaciais a objetos do dia a dia"}, "Q_12": {"pct": 60.0, "total": 25, "acertos": 15, "habilidade": "EF02MA06", "descritor": "Compreender a subtração com as ideias de separar, retirar e "}, "Q_13": {"pct": 76.0, "total": 25, "acertos": 19, "habilidade": "EF02MA19", "descritor": "Ler horas exatas e não exatas em relógios analógicos e digit"}}, "2E": {"Q_1": {"pct": 71.4, "total": 21, "acertos": 15, "habilidade": "EF01MA04", "descritor": "Contar elementos até 100 e identificar o número corresponden"}, "Q_2": {"pct": 14.3, "total": 21, "acertos": 3, "habilidade": "EF02MA20", "descritor": "Relacionar valores das cédulas e moedas para resolver situaç"}, "Q_3": {"pct": 95.2, "total": 21, "acertos": 20, "habilidade": "EF01MA15", "descritor": " Comparar objetos diversos pelo comprimento, espessura, altu"}, "Q_4": {"pct": 81.0, "total": 21, "acertos": 17, "habilidade": "EF01MA21", "descritor": "Ler gráficos de colunas simples"}, "Q_5": {"pct": 33.3, "total": 21, "acertos": 7, "habilidade": "EF02MA03", "descritor": "Compreender por meio da correspondência entre elementos de d"}, "Q_6": {"pct": 66.7, "total": 21, "acertos": 14, "habilidade": "EF02MA12", "descritor": "Identificar em desenhos, indicações de direção a partir de u"}, "Q_7": {"pct": 66.7, "total": 21, "acertos": 14, "habilidade": "EF01MA10", "descritor": "Identificar e completar com elementos ausentes, sequências  "}, "Q_8": {"pct": 4.8, "total": 21, "acertos": 1, "habilidade": "EF02MA01", "descritor": "Identificar o valor posicional dos algarismos"}, "Q_9": {"pct": 81.0, "total": 21, "acertos": 17, "habilidade": "EF01MA21", "descritor": "Leitura de tabelas "}, "Q_10": {"pct": 33.3, "total": 21, "acertos": 7, "habilidade": "EF02MA11", "descritor": "Descrever elementos ausentes em sequências de números natura"}, "Q_11": {"pct": 90.5, "total": 21, "acertos": 19, "habilidade": "EF01MA13", "descritor": "Associar formas geométricas espaciais a objetos do dia a dia"}, "Q_12": {"pct": 61.9, "total": 21, "acertos": 13, "habilidade": "EF02MA06", "descritor": "Compreender a subtração com as ideias de separar, retirar e "}, "Q_13": {"pct": 81.0, "total": 21, "acertos": 17, "habilidade": "EF02MA19", "descritor": "Ler horas exatas e não exatas em relógios analógicos e digit"}}}, "DIAG_2026_LP_3ANO": {"3B": {"Q_1": {"pct": 86.2, "total": 29, "acertos": 25, "habilidade": "EF03LP02", "descritor": "Ler e escrever corretamente palavras formadas por sílabas ca"}, "Q_2": {"pct": 62.1, "total": 29, "acertos": 18, "habilidade": "EF03LP24", "descritor": "Ler e compreender o texto apresentado;"}, "Q_3": {"pct": 96.6, "total": 29, "acertos": 28, "habilidade": "EF35LP29", "descritor": "Interpretar texto narrativo localizando informações explícit"}, "Q_4": {"pct": 89.7, "total": 29, "acertos": 26, "habilidade": "EF02LP02", "descritor": "Identificar que a mesma pauta sonora/sílaba pode formar dife"}, "Q_5": {"pct": 86.2, "total": 29, "acertos": 25, "habilidade": "EF03LP05", "descritor": "Segmentar corretamente as palavras, quando necessário."}, "Q_6": {"pct": 86.2, "total": 29, "acertos": 25, "habilidade": "EF02LP08", "descritor": "Reconhecer que as palavras são separadas por espaços em bran"}, "Q_7": {"pct": 79.3, "total": 29, "acertos": 23, "habilidade": "EF03LP24", "descritor": "Identificar informações explícitas. Ler e compreender o text"}, "Q_8": {"pct": 96.6, "total": 29, "acertos": 28, "habilidade": "EF03LP16", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}, "Q_9": {"pct": 31.0, "total": 29, "acertos": 9, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_10": {"pct": 93.1, "total": 29, "acertos": 27, "habilidade": "EF01LP04", "descritor": "Diferenciar as letras do alfabeto de outros sinais gráficos"}, "Q_11": {"pct": 75.9, "total": 29, "acertos": 22, "habilidade": "EF35LP23", "descritor": "Realizar inferência nos textos."}, "Q_12": {"pct": 65.5, "total": 29, "acertos": 19, "habilidade": "EF03LP19", "descritor": "Compreender textos do campo da vida cotidiana"}, "Q_13": {"pct": 72.4, "total": 29, "acertos": 21, "habilidade": "EF03LP24", "descritor": "Ler e compreender o texto apresentado;"}}, "3D": {"Q_1": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF03LP02", "descritor": "Ler e escrever corretamente palavras formadas por sílabas ca"}, "Q_2": {"pct": 33.3, "total": 3, "acertos": 1, "habilidade": "EF03LP24", "descritor": "Ler e compreender o texto apresentado;"}, "Q_3": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF35LP29", "descritor": "Interpretar texto narrativo localizando informações explícit"}, "Q_4": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF02LP02", "descritor": "Identificar que a mesma pauta sonora/sílaba pode formar dife"}, "Q_5": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF03LP05", "descritor": "Segmentar corretamente as palavras, quando necessário."}, "Q_6": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF02LP08", "descritor": "Reconhecer que as palavras são separadas por espaços em bran"}, "Q_7": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF03LP24", "descritor": "Identificar informações explícitas. Ler e compreender o text"}, "Q_8": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF03LP16", "descritor": "Reconhecer e produzir textos injuntivos instrucionais respei"}, "Q_9": {"pct": 0.0, "total": 3, "acertos": 0, "habilidade": "EF35LP12", "descritor": "Organizar as palavras em ordem alfabética"}, "Q_10": {"pct": 100.0, "total": 3, "acertos": 3, "habilidade": "EF01LP04", "descritor": "Diferenciar as letras do alfabeto de outros sinais gráficos"}, "Q_11": {"pct": 33.3, "total": 3, "acertos": 1, "habilidade": "EF35LP23", "descritor": "Realizar inferência nos textos."}, "Q_12": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF03LP19", "descritor": "Compreender textos do campo da vida cotidiana"}, "Q_13": {"pct": 66.7, "total": 3, "acertos": 2, "habilidade": "EF03LP24", "descritor": "Ler e compreender o texto apresentado;"}}}, "DIAG_2026_MAT_3ANO": {"3B": {"Q_1": {"pct": 63.0, "total": 27, "acertos": 17, "habilidade": "EF02MA03", "descritor": "Compreender por meio da correspondência entre elementos de d"}, "Q_2": {"pct": 88.9, "total": 27, "acertos": 24, "habilidade": "EF03MA18", "descritor": "Reconhecer o calendário anual e as possibilidades de divisão"}, "Q_3": {"pct": 70.4, "total": 27, "acertos": 19, "habilidade": "EF03MA10", "descritor": "Identificar e descrever regularidades determinando os elemen"}, "Q_4": {"pct": 70.4, "total": 27, "acertos": 19, "habilidade": "EF03MA05", "descritor": "Resolver problemas envolvendo números naturais por meio de p"}, "Q_5": {"pct": 88.9, "total": 27, "acertos": 24, "habilidade": "EF03MA26", "descritor": "Interpretar dados apresentados por meio de tabelas, gráficos"}, "Q_6": {"pct": 48.1, "total": 27, "acertos": 13, "habilidade": "EF03MA07", "descritor": "Resolver problemas com a estrutura multiplicativa"}, "Q_7": {"pct": 88.9, "total": 27, "acertos": 24, "habilidade": "EF03MA12", "descritor": "Localizar objetos no plano e fazer deslocamentos;\nSituar-se "}, "Q_8": {"pct": 33.3, "total": 27, "acertos": 9, "habilidade": "EF03MA11", "descritor": "Compreender as propriedades da adição e multiplicação por me"}, "Q_9": {"pct": 96.3, "total": 27, "acertos": 26, "habilidade": "EF01MA21", "descritor": "Ler gráficos de colunas simples"}, "Q_10": {"pct": 51.9, "total": 27, "acertos": 14, "habilidade": "EF03MA23", "descritor": "Ler horas em relógios digitais e analógicos;"}, "Q_11": {"pct": 85.2, "total": 27, "acertos": 23, "habilidade": "EF03MA12", "descritor": "Situar-se no espaço estabelecendo pontos de referência"}, "Q_12": {"pct": 100.0, "total": 27, "acertos": 27, "habilidade": "EF03MA18", "descritor": "Escolher a unidade de medida (metro, centímetro e milímetro;"}, "Q_13": {"pct": 92.6, "total": 27, "acertos": 25, "habilidade": "EF03MA13", "descritor": "Reconhecer os sólidos geométricos cubos, paralelepípedo/bloc"}, "Q_14": {"pct": 70.4, "total": 27, "acertos": 19, "habilidade": "EF03MA01", "descritor": "Compreender os princípios do SND;"}, "Q_15": {"pct": 55.6, "total": 27, "acertos": 15, "habilidade": "EF03MA24", "descritor": "Utilizar o sistema monetário brasileiro em situações-problem"}}}}, "turmas": {"DIAG_2026_LP_5ANO": ["5B", "5C", "5D"], "DIAG_2026_LP_4ANO": ["4A", "4C"], "DIAG_2026_MAT_4ANO": ["4A", "4C", "4E"], "DIAG_2026_MAT_5ANO": ["5D"], "DIAG_2026_LP_2ANO": ["2C", "2D", "2E"], "DIAG_2026_MAT_2ANO": ["2C", "2E"], "DIAG_2026_LP_3ANO": ["3B", "3D"], "DIAG_2026_MAT_3ANO": ["3B"]}, "questoes": {"DIAG_2026_LP_5ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13"], "DIAG_2026_LP_4ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13"], "DIAG_2026_MAT_4ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13", "Q_14", "Q_15", "Q_16"], "DIAG_2026_MAT_5ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13", "Q_14", "Q_15", "Q_16"], "DIAG_2026_LP_2ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11"], "DIAG_2026_MAT_2ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13"], "DIAG_2026_LP_3ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13"], "DIAG_2026_MAT_3ANO": ["Q_1", "Q_2", "Q_3", "Q_4", "Q_5", "Q_6", "Q_7", "Q_8", "Q_9", "Q_10", "Q_11", "Q_12", "Q_13", "Q_14", "Q_15"]}};
+
+const CORES = [
+  '#58a6ff', '#f78166', '#3fb950', '#d29922',
+  '#bc8cff', '#ff7b72', '#79c0ff', '#56d364'
+];
+
+const CORES_BARRA = {
+  alto: '#3fb950', medio: '#d29922', baixo: '#f85149'
+};
+
+function corPct(pct) {
+  if (pct >= 70) return CORES_BARRA.alto;
+  if (pct >= 50) return CORES_BARRA.medio;
+  return CORES_BARRA.baixo;
+}
+
+let chart = null;
+
+function populaSelects() {
+  const selAv = document.getElementById('sel-avaliacao');
+  const avaliacoes = Object.keys(DB.dados).sort();
+  
+  // Labels mais legíveis
+  const labels = {
+    'DIAG_2026_LP_1ANO': '1º ANO — Língua Portuguesa',
+    'DIAG_2026_LP_2ANO': '2º ANO — Língua Portuguesa',
+    'DIAG_2026_LP_3ANO': '3º ANO — Língua Portuguesa',
+    'DIAG_2026_LP_4ANO': '4º ANO — Língua Portuguesa',
+    'DIAG_2026_LP_5ANO': '5º ANO — Língua Portuguesa',
+    'DIAG_2026_MAT_2ANO': '2º ANO — Matemática',
+    'DIAG_2026_MAT_3ANO': '3º ANO — Matemática',
+    'DIAG_2026_MAT_4ANO': '4º ANO — Matemática',
+    'DIAG_2026_MAT_5ANO': '5º ANO — Matemática',
+  };
+  
+  avaliacoes.forEach(av => {
+    const opt = document.createElement('option');
+    opt.value = av;
+    opt.textContent = labels[av] || av;
+    selAv.appendChild(opt);
+  });
+}
+
+function atualizaTurmas() {
+  const av = document.getElementById('sel-avaliacao').value;
+  const sel = document.getElementById('sel-turma');
+  const turmaAtual = sel.value;
+  sel.innerHTML = '<option value="TODAS">Todas as turmas</option>';
+  
+  const turmas = DB.turmas[av] || [];
+  turmas.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = `Turma ${t}`;
+    sel.appendChild(opt);
+  });
+  
+  if (turmas.includes(turmaAtual)) sel.value = turmaAtual;
+}
+
+function getDados() {
+  const av = document.getElementById('sel-avaliacao').value;
+  const turmaFiltro = document.getElementById('sel-turma').value;
+  const questoes = DB.questoes[av] || [];
+  const turmasAv = DB.turmas[av] || [];
+  const turmasFiltradas = turmaFiltro === 'TODAS' ? turmasAv : [turmaFiltro];
+  return { av, questoes, turmasFiltradas, turmasAv };
+}
+
+function renderStats() {
+  const { av, questoes, turmasFiltradas } = getDados();
+  const dados = DB.dados[av] || {};
+  
+  let totalRespostas = 0, totalAcertos = 0;
+  let melhorQ = null, melhorPct = -1, piorQ = null, piorPct = 101;
+  
+  questoes.forEach(q => {
+    let soma = 0, count = 0;
+    turmasFiltradas.forEach(t => {
+      if (dados[t] && dados[t][q]) {
+        soma += dados[t][q].pct;
+        totalRespostas += dados[t][q].total;
+        totalAcertos += dados[t][q].acertos;
+        count++;
+      }
+    });
+    if (count > 0) {
+      const media = soma / count;
+      if (media > melhorPct) { melhorPct = media; melhorQ = q; }
+      if (media < piorPct) { piorPct = media; piorQ = q; }
+    }
+  });
+  
+  const mediaGeral = totalRespostas > 0 ? Math.round(totalAcertos/totalRespostas*100) : 0;
+  
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Média Geral</div>
+      <div class="stat-value" style="color:${corPct(mediaGeral)}">${mediaGeral}%</div>
+      <div class="stat-sub">${totalAcertos} acertos de ${totalRespostas}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Turmas</div>
+      <div class="stat-value" style="color:var(--accent)">${turmasFiltradas.length}</div>
+      <div class="stat-sub">selecionada(s)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Questões</div>
+      <div class="stat-value">${questoes.length}</div>
+      <div class="stat-sub">nesta avaliação</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Melhor Questão</div>
+      <div class="stat-value" style="color:var(--green)">${melhorQ || '—'}</div>
+      <div class="stat-sub">${melhorPct > -1 ? Math.round(melhorPct)+'% de acerto' : ''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Questão Difícil</div>
+      <div class="stat-value" style="color:var(--red)">${piorQ || '—'}</div>
+      <div class="stat-sub">${piorPct < 101 ? Math.round(piorPct)+'% de acerto' : ''}</div>
+    </div>
+  `;
+}
+
+function renderChart() {
+  const { av, questoes, turmasFiltradas } = getDados();
+  const dados = DB.dados[av] || {};
+  
+  const labels = questoes.map(q => q.replace('Q_', 'Q'));
+  const datasets = turmasFiltradas.map((turma, i) => ({
+    label: `Turma ${turma}`,
+    data: questoes.map(q => dados[turma] && dados[turma][q] ? dados[turma][q].pct : null),
+    backgroundColor: CORES[i % CORES.length] + 'cc',
+    borderColor: CORES[i % CORES.length],
+    borderWidth: 1.5,
+    borderRadius: 5,
+    borderSkipped: false,
+  }));
+
+  // Legend
+  document.getElementById('legend').innerHTML = turmasFiltradas.map((t, i) =>
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:${CORES[i % CORES.length]}"></div>
+      <span>Turma ${t}</span>
+    </div>`
+  ).join('');
+
+  if (chart) chart.destroy();
+  
+  chart = new Chart(document.getElementById('grafico'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          padding: 12,
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1)+'%' : 'Sem dados'}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#21262d' },
+          ticks: { color: '#8b949e', font: { size: 12, family: 'Syne', weight: '600' } }
+        },
+        y: {
+          min: 0, max: 100,
+          grid: { color: '#21262d' },
+          ticks: {
+            color: '#8b949e', font: { size: 11 },
+            callback: v => v + '%'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderTabela() {
+  const { av, questoes, turmasFiltradas } = getDados();
+  const dados = DB.dados[av] || {};
+  
+  if (questoes.length === 0) {
+    document.getElementById('tabela-container').innerHTML =
+      '<div class="empty"><div class="empty-icon">📭</div><p>Nenhum dado disponível para esta seleção.</p></div>';
+    return;
+  }
+
+  const thTurmas = turmasFiltradas.map((t, i) =>
+    `<th class="turma-col" style="color:${CORES[i % CORES.length]}">${t}</th>`
+  ).join('');
+
+  const rows = questoes.map(q => {
+    const d0 = dados[turmasFiltradas[0]] && dados[turmasFiltradas[0]][q];
+    const habilidade = d0 ? d0.habilidade.split('\n')[0] : '';
+    const descritor = d0 ? d0.descritor : '';
+
+    const colunasTurma = turmasFiltradas.map((t, i) => {
+      const d = dados[t] && dados[t][q];
+      if (!d || d.total === 0) return `<td class="turma-col"><span style="color:var(--text2)">—</span></td>`;
+      const cor = corPct(d.pct);
+      return `<td class="turma-col">
+        <div class="pct-bar-wrap" style="justify-content:center">
+          <div style="text-align:center">
+            <div class="pct-text" style="color:${cor}">${d.pct.toFixed(0)}%</div>
+            <div style="font-size:10px;color:var(--text2)">${d.acertos}/${d.total}</div>
+          </div>
+        </div>
+      </td>`;
+    }).join('');
+
+    // Media
+    let soma = 0, cnt = 0;
+    turmasFiltradas.forEach(t => {
+      if (dados[t] && dados[t][q] && dados[t][q].total > 0) { soma += dados[t][q].pct; cnt++; }
+    });
+    const media = cnt > 0 ? soma/cnt : null;
+    const mediaTxt = media !== null ?
+      `<div class="pct-bar-wrap">
+        <div class="pct-bar-bg"><div class="pct-bar" style="width:${media}%;background:${corPct(media)}"></div></div>
+        <span class="pct-text" style="color:${corPct(media)}">${media.toFixed(0)}%</span>
+      </div>` : '—';
+
+    return `<tr>
+      <td><span class="questao-badge">${q.replace('_', ' ')}</span></td>
+      <td><span class="habilidade-badge">${habilidade}</span></td>
+      <td style="color:var(--text2);font-size:12px;max-width:280px">${descritor}...</td>
+      ${colunasTurma}
+      <td>${mediaTxt}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tabela-container').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Questão</th><th>Habilidade</th><th>Descritor</th>
+        ${thTurmas}
+        <th>Média</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function atualizar() {
+  atualizaTurmas();
+  renderStats();
+  renderChart();
+  renderTabela();
+}
+
+// Init
+populaSelects();
+atualizar();
+
+// Sincroniza dados ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+  sincronizarDados();
+  
+  // Sincroniza a cada 30 segundos (mesma frequência do servidor)
+  setInterval(sincronizarDados, 30000);
+  
+  // Adiciona botão de sincronização manual
+  adicionarBotaoSync();
+});
+
+// Função para adicionar botão de sincronização
+function adicionarBotaoSync() {
+  const header = document.querySelector('header');
+  const btnSync = document.createElement('button');
+  
+  btnSync.id = 'btn-sync';
+  btnSync.innerHTML = '🔄 Sincronizar';
+  btnSync.style.cssText = `
+    margin-left: auto;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: opacity 0.2s;
+  `;
+  
+  btnSync.addEventListener('click', async function() {
+    btnSync.disabled = true;
+    btnSync.innerHTML = '⏳ Sincronizando...';
+    
+    try {
+      const response = await fetch('/api/sync', { method: 'POST' });
+      const result = await response.json();
+      
+      if (result.success) {
+        btnSync.innerHTML = '✓ Sincronizado!';
+        sincronizarDados();
+        setTimeout(() => {
+          btnSync.innerHTML = '🔄 Sincronizar';
+          btnSync.disabled = false;
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar:', error);
+      btnSync.innerHTML = '✗ Erro!';
+      btnSync.disabled = false;
+    }
+  });
+  
+  header.appendChild(btnSync);
+}
+</script>
+</body>
+</html>
