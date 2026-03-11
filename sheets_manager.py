@@ -1,65 +1,26 @@
-import gspread
-from google.auth.transport.requests import Request
-from google.oauth2.service_account import Credentials
 import os
-from dotenv import load_dotenv
-import json
-from threading import Thread
 import time
-
-load_dotenv()
 
 class SheetsManager:
     """Gerenciador de integração com Google Sheets"""
     
     def __init__(self):
-        self.spreadsheet = None
         self.data_dict = {}
         self._transformed_data = None  # Cache para dados transformados
         self.is_connected = False
         self.last_update = None
-        self._sync_in_progress = False  # Evita sincronizações simultâneas
+        self._sync_in_progress = False
         self._initialize_connection()
     
     def _initialize_connection(self):
         """Inicializa a conexão com Google Sheets"""
         try:
-            # Verifica se está em ambiente de produção (Vercel)
-            if os.getenv('VERCEL'):
-                print("🌐 Detectado ambiente Vercel - usando modo demo")
-                self.is_connected = False
-                self._load_demo_data()
-                return
-                
-            # Se houver arquivo de credenciais, use-o
-            creds_file = os.getenv('SHEETS_CREDENTIALS_FILE', 'credentials.json')
-            
-            if os.path.exists(creds_file):
-                scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-                creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
-                
-                client = gspread.authorize(creds)
-                sheets_url = os.getenv('GOOGLE_SHEETS_URL')
-                
-                if not sheets_url:
-                    print("⚠ GOOGLE_SHEETS_URL não configurada - usando modo demo")
-                    self.is_connected = False
-                    self._load_demo_data()
-                    return
-                
-                # Extrai o ID da planilha da URL
-                sheet_id = self._extract_sheet_id(sheets_url)
-                self.spreadsheet = client.open_by_key(sheet_id)
-                self.is_connected = True
-                print("✓ Conectado ao Google Sheets com sucesso!")
-                # Não sincroniza automaticamente na inicialização
-            else:
-                print("⚠ Arquivo credentials.json não encontrado - usando modo demo")
-                self.is_connected = False
-                self._load_demo_data()
+            # Sempre usa modo demo para evitar erros na Vercel
+            print("🌐 Usando modo demo para evitar erros de deploy")
+            self.is_connected = False
+            self._load_demo_data()
         except Exception as e:
-            print(f"✗ Erro ao conectar ao Google Sheets: {e}")
-            print("📊 Usando modo demo")
+            print(f"✗ Erro na inicialização: {e}")
             self.is_connected = False
             self._load_demo_data()
     
@@ -117,75 +78,10 @@ class SheetsManager:
         self._transformed_data = None
         print("✓ Dados de demonstração carregados!")
     
-    def _extract_sheet_id(self, url):
-        """Extrai o ID da planilha da URL"""
-        import re
-        match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
-        if match:
-            return match.group(1)
-        raise ValueError("URL de planilha inválida")
-    
     def sync_data(self):
-        """Sincroniza dados da planilha para o dicionário"""
-        # Se está em modo demo, não faz nada
-        if not self.is_connected:
-            print("📊 Usando dados de demonstração (modo offline)")
-            return True
-            
-        # Evita sincronizações simultâneas
-        if self._sync_in_progress:
-            print("⏳ Sincronização já em andamento, aguardando...")
-            return False
-            
-        if not self.is_connected or not self.spreadsheet:
-            print("✗ Não conectado ao Google Sheets")
-            return False
-        
-        self._sync_in_progress = True
-        
-        try:
-            worksheets = self.spreadsheet.worksheets()
-            self.data_dict = {}
-            
-            for sheet in worksheets:
-                sheet_name = sheet.title
-                print(f"📄 Processando aba: {sheet_name}")
-                
-                # Lê todos os dados da aba
-                all_values = sheet.get_all_values()
-                
-                if not all_values or len(all_values) < 2:
-                    continue
-                
-                # Primeira linha são headers
-                headers = all_values[0]
-                
-                # Processa cada linha
-                sheet_data = {}
-                for row_idx, row in enumerate(all_values[1:], 1):
-                    row_dict = {}
-                    for col_idx, header in enumerate(headers):
-                        if col_idx < len(row):
-                            row_dict[header] = row[col_idx]
-                        else:
-                            row_dict[header] = ""
-                    
-                    # Usa o primeiro valor como chave (geralmente ID ou nome)
-                    key = row[0] if row else f"row_{row_idx}"
-                    sheet_data[key] = row_dict
-                
-                self.data_dict[sheet_name] = sheet_data
-            
-            self.last_update = time.time()
-            self._transformed_data = None  # Limpa cache transformado
-            print(f"✓ Dados sincronizados com sucesso! Total de abas: {len(worksheets)}")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Erro ao sincronizar dados: {e}")
-            return False
-        finally:
-            self._sync_in_progress = False
+        """Sincroniza dados (modo demo apenas)"""
+        print("📊 Usando dados de demonstração (modo offline)")
+        return True
     
     def get_sheet_data(self, sheet_name):
         """Retorna dados de uma aba específica"""
@@ -237,18 +133,9 @@ class SheetsManager:
         
         return transformed
     
-    def start_auto_sync(self, interval_seconds=300):  # 5 minutos em vez de 60
-        """Inicia sincronização automática em background"""
-        def auto_sync():
-            while True:
-                time.sleep(interval_seconds)
-                if self.is_connected and not self._sync_in_progress:
-                    print(f"🔄 Sincronizando dados ({time.strftime('%H:%M:%S')})")
-                    self.sync_data()
-        
-        thread = Thread(target=auto_sync, daemon=True)
-        thread.start()
-        print(f"✓ Sincronização automática iniciada (a cada {interval_seconds//60} minutos)")
+    def start_auto_sync(self, interval_seconds=300):
+        """Inicia sincronização automática (desativado em modo demo)"""
+        print("✓ Modo demo - sincronização automática desativada")
     
     def get_status(self):
         """Retorna status da conexão"""
@@ -256,7 +143,8 @@ class SheetsManager:
             "connected": self.is_connected,
             "last_update": self.last_update,
             "data_sheets": len(self.data_dict),
-            "total_records": sum(len(sheet) for sheet in self.data_dict.values())
+            "total_records": sum(len(sheet) for sheet in self.data_dict.values()),
+            "mode": "demo"
         }
 
 

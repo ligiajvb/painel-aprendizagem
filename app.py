@@ -83,10 +83,6 @@ def api_raw():
 
 # ==================== CONFIGURAÇÃO ====================
 
-# Handler para Vercel
-def handler(request):
-    return app(request.environ, lambda status, headers: None)
-
 if __name__ == '__main__':
     # Inicia sincronização automática a cada 5 minutos
     print("\n" + "="*50)
