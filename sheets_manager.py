@@ -32,26 +32,34 @@ class SheetsManager:
         """
         # 1. Tenta variável de ambiente (Vercel / produção)
         credentials_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
-        if credentials_json:
+        if credentials_json and credentials_json.strip():
             try:
                 creds_dict = json.loads(credentials_json)
                 print("✓ Usando credenciais da variável de ambiente")
                 return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
             except json.JSONDecodeError as e:
+                print(f"✗ Erro ao decodificar GOOGLE_CREDENTIALS_JSON: {e}")
                 raise ValueError(f"GOOGLE_CREDENTIALS_JSON inválido: {e}")
 
-        # 2. Fallback: arquivo local (apenas desenvolvimento)
-        creds_file = os.getenv('SHEETS_CREDENTIALS_FILE', 'credentials.json')
-        if os.path.exists(creds_file):
-            print(f"✓ Usando arquivo de credenciais local: {creds_file}")
-            return Credentials.from_service_account_file(creds_file, scopes=SCOPES)
+        # 2. Fallback: arquivo local (apenas desenvolvimento local)
+        if not os.getenv('VERCEL'):
+            creds_file = 'credentials.json'
+            if os.path.exists(creds_file):
+                print(f"✓ Usando arquivo de credenciais local: {creds_file}")
+                return Credentials.from_service_account_file(creds_file, scopes=SCOPES)
+            else:
+                print(f"✗ Arquivo {creds_file} não encontrado localmente")
 
         return None
 
     def _initialize_connection(self):
         """Inicializa a conexão com Google Sheets"""
+        print("🔧 Iniciando conexão com Google Sheets...")
+        print(f"🌍 Ambiente VERCEL: {os.getenv('VERCEL')}")
+
         try:
             sheets_url = os.getenv('GOOGLE_SHEETS_URL')
+            print(f"📋 GOOGLE_SHEETS_URL configurada: {'Sim' if sheets_url else 'Não'}")
 
             if not sheets_url:
                 print("⚠ GOOGLE_SHEETS_URL não configurada - usando modo demo")
@@ -65,8 +73,10 @@ class SheetsManager:
                 self._load_demo_data()
                 return
 
+            print("🔐 Autorizando cliente Google Sheets...")
             client = gspread.authorize(creds)
             sheet_id = self._extract_sheet_id(sheets_url)
+            print(f"📊 Abrindo planilha ID: {sheet_id}")
             self.spreadsheet = client.open_by_key(sheet_id)
             self.is_connected = True
             print("✓ Conectado ao Google Sheets!")
